@@ -9,7 +9,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 
-export const userRoleEnum = pgEnum("user_role", ["CUSTOMER", "ADMIN"]);
+export const userRoleEnum = pgEnum("user_role", ["USER", "ADMIN"]);
 
 export const users = pgTable(
   "users",
@@ -18,7 +18,7 @@ export const users = pgTable(
     name: varchar("name", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }).notNull(),
     passwordHash: varchar("password_hash", { length: 255 }).notNull(),
-    role: userRoleEnum("role").notNull().default("CUSTOMER"),
+    role: userRoleEnum("role").notNull().default("USER"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -38,12 +38,12 @@ export const sessions = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    ipAddress: varchar("ip_address", { length: 45 }).notNull(),
+    ipAddress: varchar("ip_address", { length: 45 }),
     userAgent: varchar("user_agent", { length: 500 }).notNull().default("web"),
     deviceName: varchar("device_name", { length: 255 }),
-    refreshTokenHash: varchar("refresh_token_hash", { length: 64 }).notNull(),
+    refreshTokenHash: varchar("refresh_token_hash").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }), //
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -52,9 +52,14 @@ export const sessions = pgTable(
       .defaultNow(),
   },
   (table) => [
+    index("sessions_user_id_idx").on(table.userId),
     index("sessions_user_id_last_active_at_idx").on(
       table.userId,
       table.lastActiveAt,
     ),
+    uniqueIndex("sessions_refresh_token_hash_unique").on(
+      table.refreshTokenHash,
+    ),
+    index("sessions_expires_at_idx").on(table.expiresAt),
   ],
 );
