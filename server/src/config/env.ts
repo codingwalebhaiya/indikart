@@ -12,4 +12,12 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
 });
 
-export const env = envSchema.parse(process.env);
+const parsedEnv = envSchema.safeParse(process.env);
+
+if (!parsedEnv.success) {
+  console.error("Invalid environment variables:");
+  console.error(z.treeifyError(parsedEnv.error));
+  process.exit(1);
+}
+
+export const env = Object.freeze(parsedEnv.data);
