@@ -1,13 +1,5 @@
 import { z } from "zod";
 
-// Reusable - DRY
-const emailSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .email("Invalid email format")
-  .max(255, "Email too long");
-
 const passwordSchema = z
   .string()
   .trim()
@@ -25,18 +17,19 @@ export const registerBodySchema = z
       .string()
       .trim()
       .min(2, "Name must be at least 2 characters")
-      .max(50, "Name must be at most 50 characters")
-      .regex(/^[A-Za-z\s]+$/, "Name can only contain letters and spaces"),
-
-    email: emailSchema,
-
+      .max(100, "Name must be at most 100 characters"),
+    email: z
+      .email("Invalid email format")
+      .transform((email) => email.toLowerCase().trim()),
     password: passwordSchema,
   })
   .strict();
 
 export const loginBodySchema = z
   .object({
-    email: emailSchema,
+    email: z
+      .email("Invalid email format")
+      .transform((email) => email.toLowerCase().trim()),
     password: z.string().trim().min(1, "Password is required"),
   })
   .strict();
