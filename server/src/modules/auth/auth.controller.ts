@@ -1,12 +1,15 @@
 import type { Request, Response } from "express";
 import authService from "./auth.service.js";
 import { ApiResponse } from "../../utils/apiResponse.js";
+import { logger } from "../../infrastructure/logger/logger.js";
 
 const register = async (req: Request, res: Response) => {
   const user = await authService.registerUser(req.body);
-  return new ApiResponse(201, "User registered successfully", {
-    user: { id: user.id, name: user.name, email: user.email },
-  });
+  return res.status(201).json(
+    new ApiResponse(201, "User registered successfully", {
+      user: { id: user.id, name: user.name, email: user.email },
+    }),
+  );
 };
 
 const login = async (req: Request, res: Response) => {
@@ -32,9 +35,14 @@ const login = async (req: Request, res: Response) => {
     sameSite: "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
-   return new ApiResponse(200, "User logged in successfully", {
-    user: { id: user.id, name: user.name, email: user.email },
-  });
+
+  logger.info(`User logged in successfully ${user.email}`);
+
+  return res.status(200).json(
+    new ApiResponse(200, "User logged in successfully", {
+      user: { id: user.id, name: user.name, email: user.email },
+    }),
+  );
 };
 
 export const authController = {

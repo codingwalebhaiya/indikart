@@ -31,7 +31,11 @@ const registerUser = async (userData: RegisterInput) => {
       email: userData.email,
       password: hashedPassword,
     })
-    .returning();
+    .returning({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+    });
 
   if (!user) {
     throw new ApiError(404, "Failed to create user");
@@ -74,16 +78,13 @@ const loginUser = async (userData: LoginInput, metadata: LoginMetadata) => {
     .update(refreshToken)
     .digest("hex");
 
-  await db
-    .insert(sessions)
-    .values({
-      userId: existingUser.id,
-      refreshTokenHash,
-      expiresAt: sessionExpiry,
-      ipAddress: metadata?.ipAddress,
-      userAgent: metadata?.userAgent,
-    })
-    .returning();
+  await db.insert(sessions).values({
+    userId: existingUser.id,
+    refreshTokenHash,
+    expiresAt: sessionExpiry,
+    ipAddress: metadata?.ipAddress,
+    userAgent: metadata?.userAgent,
+  });
 
   return {
     accessToken,
