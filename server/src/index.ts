@@ -1,4 +1,4 @@
-import { pool } from "./db/index.js";
+import { pool } from "./db/db.js";
 import app from "./app.js";
 import { env } from "./config/env.js";
 import { logger } from "./infrastructure/logger/logger.js";

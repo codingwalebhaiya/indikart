@@ -1,19 +1,16 @@
 import type { LoginInput, RegisterInput } from "./auth.schemas.js";
-import { db } from "../../db/index.js";
-import { sessions, users } from "../../db/schema.js";
+import { db } from "../../db/db.js";
+import { users, sessions } from "../../db/schema.js";
 import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { ApiError } from "../../utils/apiError.js";
 import { generateAccessToken, generateRefreshToken } from "../../utils/jwt.js";
-
 
 interface LoginMetadata {
   ipAddress?: string;
   userAgent?: string;
 }
-
 
 const registerUser = async (userData: RegisterInput) => {
   const existingUser = await db
@@ -47,9 +44,7 @@ const registerUser = async (userData: RegisterInput) => {
   return user;
 };
 
-
 const loginUser = async (userData: LoginInput, metadata: LoginMetadata) => {
-
   const [existingUser] = await db
     .select()
     .from(users)

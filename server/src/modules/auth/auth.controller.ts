@@ -1,6 +1,5 @@
 import type { Request, Response } from "express";
 import authService from "./auth.service.js";
-import type { LoginInput, RegisterInput } from "./auth.schemas.js";
 
 const register = async (req: Request, res: Response) => {
   const user = await authService.registerUser(req.body);
