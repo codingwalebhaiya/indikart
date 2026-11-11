@@ -31,11 +31,7 @@ const registerUser = async (userData: RegisterInput) => {
       email: userData.email,
       password: hashedPassword,
     })
-    .returning({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-    });
+    .returning();
 
   if (!user) {
     throw new ApiError(404, "Failed to create user");
