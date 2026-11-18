@@ -6,6 +6,7 @@ import authRouter from "./modules/auth/auth.routes.js";
 import { env } from "./config/env.js";
 import { errorHandler } from "./middlewares/errorHandler.middleware.js";
 import { notFoundHandler } from "./middlewares/notFound.middleware.js";
+import categoryRouter from "./modules/category/category.route.js";
 
 const app = express();
 app.use(helmet());
@@ -20,6 +21,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use("/api/v1/auth", authRouter);
+//app.use("/api/v1/categories", categoryRouter);
 app.get("/api/v1/health", (_req: Request, res: Response) => {
   res.json({ message: "Server is running!", uptime: process.uptime() });
 });

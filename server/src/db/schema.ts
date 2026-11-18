@@ -9,38 +9,33 @@ import {
   boolean,
   uniqueIndex,
   text,
-  integer,
   index,
   numeric,
   check,
   primaryKey,
-  jsonb,
-  decimal,
+  integer,
 } from "drizzle-orm/pg-core";
+
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 // ============ ENUMS ============
 export const userRoleEnum = pgEnum("user_role", ["USER", "ADMIN"]);
 
-export const orderStatusEnum = pgEnum("order_status", [
-  "pending",
-  "paid",
-  "shipped",
-  "delivered",
-  "cancelled",
-]);
-export const paymentStatusEnum = pgEnum("payment_status", [
-  "pending",
-  "success",
-  "failed",
-  "refunded",
-]);
-export const paymentMethodEnum = pgEnum("payment_method", [
-  "cod",
-  "upi",
-  "card",
-  "netbanking",
-  "wallet",
-]);
+
+export const brands = pgTable(
+  "brands",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: varchar("name", { length: 100 }).notNull(),
+    slug: varchar("slug", { length: 120 }).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [uniqueIndex("brand_slug_idx").on(table.slug)],
+);
 
 // Users table
 export const users = pgTable(
@@ -143,6 +138,7 @@ export const addresses = pgTable("addresses", {
     .$onUpdate(() => new Date()),
 });
 
+//  --------------- products -----------------
 export const products = pgTable(
   "products",
   {
@@ -153,9 +149,8 @@ export const products = pgTable(
     brandId: uuid("brand_id").references(() => brands.id, {
       onDelete: "cascade",
     }),
-    // store in cents/paise to avoid float issues, or use numeric
-    // price: numeric("price", { precision: 10, scale: 2 }).notNull(),
-    // stock: integer("stock").notNull().default(0),
+    // base price - jab koi variant select na ho tab dikhane ke liye
+    basePrice: numeric("base_price", { precision: 10, scale: 2 }).notNull(),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", {
       withTimezone: true,
@@ -167,9 +162,7 @@ export const products = pgTable(
     // 1. Case-insensitive unique slug
     uniqueIndex("products_slug_unique_idx").on(sql`lower(${table.slug})`),
     index("products_description_idx").on(table.description),
-    // 2. Data integrity checks
-    // check("products_price_check", sql`${table.price} >= 0`),
-    // check("products_stock_check", sql`${table.stock} >= 0`),
+    check("products_base_price_check", sql`${table.basePrice} >= 0`),
   ],
 );
 
@@ -179,7 +172,9 @@ export const categories = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     name: varchar("name", { length: 100 }).notNull(),
     slug: varchar("slug", { length: 120 }).notNull(),
-    parentId: uuid("parent_id"),
+    parentId: uuid("parent_id").references((): AnyPgColumn => categories.id, {
+      onDelete: "set null",
+    }), // self-referencing key - parent category ko refer karegi
     createdAt: timestamp("created_at", {
       withTimezone: true,
     })
@@ -213,34 +208,27 @@ export const productCategory = pgTable(
   ],
 );
 
-export const productOptionsGroups = pgTable(
-  "product_option_groups",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    productId: uuid("product_id")
-      .notNull()
-      .references(() => products.id, {
-        onDelete: "cascade",
-      }),
-    name: varchar("name", { length: 100 }).notNull(),
-    createdAt: timestamp("created_at", {
-      withTimezone: true,
-    })
-      .notNull()
-      .defaultNow(),
-  },
+// attributes like Color, Size, etc.
+export const attributes = pgTable("attributes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  slug: varchar("slug", { length: 120 }).notNull(),
+  createdAt: timestamp("created_at", {
+    withTimezone: true,
+  })
+    .notNull()
+    .defaultNow(),
+});
 
-  (table) => [index("product_option_group_product_id_idx").on(table.productId)],
-);
-
-export const productOptionValues = pgTable(
-  "product_option_values",
+// attribute values like red, blue, green, small, medium, large, etc.
+export const attributeValues = pgTable(
+  "attribute_values",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     value: varchar("value", { length: 50 }).notNull(),
-    optionGroupId: uuid("option_group_id")
+    attributeId: uuid("attribute_id")
       .notNull()
-      .references(() => productOptionsGroups.id, {
+      .references(() => attributes.id, {
         onDelete: "cascade",
       }),
     colorCode: varchar("color_code", { length: 20 }),
@@ -252,8 +240,11 @@ export const productOptionValues = pgTable(
   },
 
   (table) => [
-    index("product_option_value_option_group_id_idx").on(table.optionGroupId),
-    index("product_option_value_value_idx").on(table.value),
+    uniqueIndex("attribute_value_unique_idx").on(
+      table.attributeId,
+      sql`lower(${table.value})`
+    ),
+
   ],
 );
 
@@ -261,17 +252,17 @@ export const productVariant = pgTable(
   "product_variant",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    productId: uuid("product_id").references(() => products.id, {
-      onDelete: "cascade",
-    }),
+    productId: uuid("product_id")
+      .references(() => products.id, {
+        onDelete: "cascade",
+      })
+      .notNull(),
     sku: varchar("sku", { length: 50 }).notNull().unique(), // sku means -  Stock Keeping Unit ( A unique code for each product variant )-  unique
     // alphanumeric code (like TSHIRT-BLK-L or IPH15-256-BLU)  , it helps to track inventory and sales of each product variant.
 
-    // DYNAMIC ATTRIBUTES EXAMPLE: { "size": "M", "color": "Red" } OR { "ram": "16GB", "storage": "512GB" }
-    attributes: jsonb("attributes").notNull().$type<Record<string, string>>(),
     price: numeric("price", { precision: 10, scale: 2 }).notNull(),
-    discountPrice: decimal("discount_price", { precision: 10, scale: 2 }),
-    //stock: integer("stock").notNull().default(0),
+    //discountPrice: decimal("discount_price", { precision: 10, scale: 2 }),
+    stock: integer("stock").notNull().default(0),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", {
       withTimezone: true,
@@ -282,11 +273,8 @@ export const productVariant = pgTable(
   (table) => [
     uniqueIndex("product_variant_sku_unique_idx").on(table.sku),
     index("product_variant_product_id_idx").on(table.productId),
-    index("product_variant_attributes_idx").on(table.attributes),
     index("product_variant_price_idx").on(table.price),
-    //index("product_variant_stock_idx").on(table.stock),
     check("product_variant_price_check", sql`${table.price} >= 0`),
-    //check("product_variant_stock_check", sql`${table.stock} >= 0`),
     check(
       "product_variant_sku_length_check",
       sql`length(${table.sku}) BETWEEN 1 AND 50`,
@@ -294,17 +282,23 @@ export const productVariant = pgTable(
   ],
 );
 
-export const variantOptionValues = pgTable(
-  "variant_option_values",
+// product_variants (Many) <-> attribute_values (Many)
+
+// Ek Variant me bahut saare Attribute Values ho sakte hain - Red + XL
+// Aur ek Attribute Value bahut saare Variants me use ho sakta hai - Red color Red-L, Red-XL, Red-XXL teeno me hai.
+
+// Direct connect nahi ho sakta, isiliye beech me ek // Junction Table chahiye: variant_attribute_values
+export const variantAttributeValues = pgTable(
+  "variant_attribute_values",
   {
     variantId: uuid("variant_id")
       .notNull()
       .references(() => productVariant.id, {
         onDelete: "cascade",
       }),
-    optionValueId: uuid("option_value_id")
+    attributeValueId: uuid("attribute_value_id")
       .notNull()
-      .references(() => productOptionValues.id, {
+      .references(() => attributeValues.id, {
         onDelete: "cascade",
       }),
     createdAt: timestamp("created_at", {
@@ -314,28 +308,15 @@ export const variantOptionValues = pgTable(
       .defaultNow(),
   },
   (table) => [
-    primaryKey({ columns: [table.variantId, table.optionValueId] }),
-    index("variant_option_values_option_value_id_idx").on(table.optionValueId),
+    primaryKey({ columns: [table.variantId, table.attributeValueId] }),
+    index("variant_attribute_values_attribute_value_id_idx").on(
+      table.attributeValueId,
+    ),
   ],
 );
 
-export const brands = pgTable(
-  "brands",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    name: varchar("name", { length: 100 }).notNull(),
-    slug: varchar("slug", { length: 120 }).notNull(),
-    createdAt: timestamp("created_at", {
-      withTimezone: true,
-    })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [uniqueIndex("brand_slug_idx").on(table.slug)],
-);
-
-export const productVariantImages = pgTable(
-  "product_variant_images",
+export const productImages = pgTable(
+  "product_images",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     productId: uuid("product_id")
@@ -343,20 +324,14 @@ export const productVariantImages = pgTable(
       .references(() => products.id, {
         onDelete: "cascade",
       }),
-    optionValueId: uuid("option_value_id").references(
-      () => productOptionValues.id,
-      {
-        onDelete: "cascade",
-      },
-    ),
-    // variantId: uuid("variant_id").references(() => productVariant.id, {
-    // onDelete: "cascade",
-    // }),
 
-    imageStorageKey: varchar("image_storage_key", { length: 255 }).notNull(),
-    isPrimary: boolean("is_primary").notNull().default(false), //On homepage / category page you show ONE image
-    altText: varchar("alt_text", { length: 255 }),
-    position: integer("position").notNull().default(0), //shows images in specific order you set.
+    variantId: uuid("variant_id").references(() => productVariant.id, {
+      onDelete: "cascade",
+    }),
+
+    s3Key: varchar("s3_key", { length: 500 }).notNull(),
+    url: varchar("url", { length: 500 }).notNull(), // cloudfront url of the image
+    isPrimary: boolean("is_primary").default(false), //On homepage / category page you show ONE image
     createdAt: timestamp("created_at", {
       withTimezone: true,
     })
@@ -365,20 +340,9 @@ export const productVariantImages = pgTable(
   },
   (table) => [
     index("product_images_product_id_idx").on(table.productId),
-    index("product_images_option_value_id_idx").on(table.optionValueId),
-    //  Enforce 5 images per color: unique(optionValueId, position)
-    uniqueIndex("product_variant_image_color_position_unique_idx").on(
-      table.optionValueId,
-      table.position,
-    ),
-    check("product_images_position_check", sql`${table.position} >= 0`),
     check(
       "product_images_image_storage_key_check",
-      sql`${table.imageStorageKey} IS NOT NULL`,
+      sql`${table.s3Key} IS NOT NULL`,
     ),
-    // check(
-    //   "product_images_max_images_check",
-    //   //sql`array_length(${table.imageStorageKey}, 1) BETWEEN 1 AND 4`,
-    // ),
   ],
 );

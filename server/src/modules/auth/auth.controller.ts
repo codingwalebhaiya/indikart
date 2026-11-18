@@ -1,18 +1,20 @@
 import type { Request, Response } from "express";
-import authService from "./auth.service.js";
 import { ApiResponse } from "../../utils/apiResponse.js";
 import { logger } from "../../infrastructure/logger/logger.js";
+import  asyncHandler  from "../../utils/asyncHandler.js";
+import authService from "./auth.service.js";
 
-const register = async (req: Request, res: Response) => {
+
+const register =  asyncHandler(async (req: Request, res: Response) => {
   const user = await authService.registerUser(req.body);
   return res.status(201).json(
     new ApiResponse(201, "User registered successfully", {
       user: { id: user.id, name: user.name, email: user.email },
     }),
   );
-};
+}) ;
 
-const login = async (req: Request, res: Response) => {
+const login =  asyncHandler(async (req: Request, res: Response) => {
   const loginMetadata = {
     ipAddress: req.ip || req.socket.remoteAddress || "unknown",
     userAgent: req.headers["user-agent"] || "unknown",
@@ -43,7 +45,7 @@ const login = async (req: Request, res: Response) => {
       user: { id: user.id, name: user.name, email: user.email },
     }),
   );
-};
+});
 
 export const authController = {
   register,

@@ -1,4 +1,4 @@
-import type { LoginInput, RegisterInput } from "./auth.schemas.js";
+import type { LoginInput, RegisterInput } from "./auth.validation.js";
 import { db } from "../../db/db.js";
 import { users, sessions } from "../../db/schema.js";
 import { eq, sql } from "drizzle-orm";
@@ -29,7 +29,7 @@ const registerUser = async (userData: RegisterInput) => {
     .values({
       name: userData.name,
       email: userData.email,
-      password: hashedPassword,
+      passwordHash: hashedPassword,
     })
     .returning({
       id: users.id,
@@ -56,7 +56,7 @@ const loginUser = async (userData: LoginInput, metadata: LoginMetadata) => {
   }
   const isPasswordValid = await bcrypt.compare(
     userData.password,
-    existingUser.password,
+    existingUser.passwordHash,
   );
   if (!isPasswordValid) {
     throw new ApiError(401, "Invalid email or password");
