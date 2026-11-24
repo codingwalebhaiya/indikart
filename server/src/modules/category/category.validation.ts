@@ -40,17 +40,8 @@ export const getAllCategoriesSchema = z.object({
   }),
 });
 
-export type CreateCategoryInput = z.infer<typeof createCategorySchema>["body"];
-export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>["body"];
-
-export type DeleteCategoryInput = z.infer<
-  typeof deleteCategorySchema
->["params"];
-
-export type GetCategoryByIdInput = z.infer<
-  typeof getCategoryByIdSchema
->["params"];
-
-export type GetAllCategoriesInput = z.infer<
-  typeof getAllCategoriesSchema
->["query"];
+export const getCategoryBySlugSchema = z.object({
+  params: z.object({
+    slug: z.string().min(2).max(100),
+  }),
+});

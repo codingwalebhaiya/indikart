@@ -3,7 +3,7 @@ import { ZodError } from "zod";
 import { logger } from "../infrastructure/logger/logger.js";
 import { ApiError } from "../utils/apiError.js";
 
-export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
+export const errorHandlerMiddleware: ErrorRequestHandler = (err, req, res, next) => {
   // Delegate if the response has already started.
   if (res.headersSent) {
     return next(err);
@@ -52,14 +52,28 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
       err,
       method: req.method,
       url: req.originalUrl,
-      
     },
     "Unhandled application error",
   );
 
-  // 5. Return a safe response.
+  // 5. Agar simple Error hai (Repository se aaya hai)
   return res.status(500).json({
     success: false,
-    message: "Internal server error",
+    message: err.message || "Internal server error",
   });
 };
+
+
+//  ------------------- note -------------
+
+// Frontend: { name: "" } bheja (galat data)
+//    ↓
+// Route: validate(createCategorySchema) - Zod check karega
+//    ↓
+// Zod bolega: "name min 2 characters chahiye" - ZodError phenkega
+//    ↓
+// validate middleware: next(err) karega
+//    ↓
+// error.middleware: ZodError ko pakad ke 400 bana ke Frontend ko bhej dega
+//    ↓
+// Frontend: "Name should be at least 2 characters" dikhega
