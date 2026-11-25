@@ -7,6 +7,7 @@ import { env } from "./config/env.js";
 import { errorHandlerMiddleware } from "./middlewares/errorHandler.middleware.js";
 import { notFoundHandler } from "./middlewares/notFound.middleware.js";
 import categoryRouter from "./modules/category/category.route.js";
+import productRouter from "./modules/product/product.route.js";
 
 const app = express();
 app.use(helmet());
@@ -22,7 +23,7 @@ app.use(cookieParser());
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/categories", categoryRouter);
-
+app.use("/api/v1/products", productRouter);
 
 app.get("/api/v1/health", (_req: Request, res: Response) => {
   res.json({ message: "Server is running!", uptime: process.uptime() });

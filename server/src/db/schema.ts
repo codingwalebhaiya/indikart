@@ -21,6 +21,10 @@ import type { AnyPgColumn } from "drizzle-orm/pg-core";
 // ============ ENUMS ============
 export const userRoleEnum = pgEnum("user_role", ["USER", "ADMIN"]);
 
+export const status = pgEnum("status", ["draft", "published", "archived"]);
+
+// 
+export const imageStatusEnum = pgEnum("image_status", ["uploaded", "processing", "ready", "failed", "deleted"]);
 
 export const brands = pgTable(
   "brands",
@@ -151,12 +155,20 @@ export const products = pgTable(
     }),
     // base price - jab koi variant select na ho tab dikhane ke liye
     basePrice: numeric("base_price", { precision: 10, scale: 2 }).notNull(),
-    isActive: boolean("is_active").notNull().default(true),
+    isFeatured: boolean("is_featured").notNull().default(false),
+    status: status("status").notNull().default("draft"),
+    publishedAt: timestamp("published_at").defaultNow(),
     createdAt: timestamp("created_at", {
       withTimezone: true,
     })
       .notNull()
       .defaultNow(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   (table) => [
     // 1. Case-insensitive unique slug
@@ -242,9 +254,8 @@ export const attributeValues = pgTable(
   (table) => [
     uniqueIndex("attribute_value_unique_idx").on(
       table.attributeId,
-      sql`lower(${table.value})`
+      sql`lower(${table.value})`,
     ),
-
   ],
 );
 
@@ -326,12 +337,18 @@ export const productImages = pgTable(
       }),
 
     variantId: uuid("variant_id").references(() => productVariant.id, {
-      onDelete: "cascade",
+      onDelete: "cascade", // variant delete to image delete
     }),
 
-    s3Key: varchar("s3_key", { length: 500 }).notNull(),
-    url: varchar("url", { length: 500 }).notNull(), // cloudfront url of the image
+    rawS3Key: varchar("raw_s3_key", { length: 500 }), // raw/products/xxx.jpg - temporary, worker delete kar dega
+    s3Key: varchar("s3_key", { length: 500 }).notNull(), // processed/products/xxx-medium.webp
+    url: varchar("url", { length: 500 }).notNull(),
+    // Extra versions for fast loading
+    variantsJson: text("variants_json"), // {"thumb": ".../thumb.webp", "medium": ".../medium.webp", "large": ".../large.webp"} JSON string
+
     isPrimary: boolean("is_primary").default(false), //On homepage / category page you show ONE image
+    sortOrder: integer("sort_order").default(0), // Images first by sort_order, then by 
+    status: imageStatusEnum("status").notNull().default("processing"),
     createdAt: timestamp("created_at", {
       withTimezone: true,
     })
